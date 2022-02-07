@@ -30,6 +30,11 @@ from icmplib import ping, traceroute
 from util import regex_match, check_DNS, check_Allowed_IPs, check_remote_endpoint, \
     check_IP_with_range, clean_IP_with_range
 
+
+
+
+
+
 # Dashboard Version
 DASHBOARD_VERSION = 'v3.0.5'
 # WireGuard's configuration path
@@ -1702,6 +1707,71 @@ def get_host_bind():
     app_port = config.get("Server", "app_port")
 
     return app_ip, app_port
+
+# apix
+
+
+from flask import Blueprint, request
+
+api_routes = Blueprint("api", __name__)
+
+
+
+@api_routes.route('/interface/<config_name>', methods=['GET'])
+def get_conf(config_name):
+    """
+    Get configuration setting of wireguard interface.
+    @param config_name: Name of WG interface
+    @type config_name: str
+    @return: TODO
+    """
+
+    config_interface = read_conf_file_interface(config_name)
+    search = request.args.get('search')
+    print(search)
+    if len(search) == 0:
+        search = ""
+    search = urllib.parse.unquote(search)
+    config = get_dashboard_conf()
+    sort = config.get("Server", "dashboard_sort")
+    peer_display_mode = config.get("Peers", "peer_display_mode")
+    wg_ip = config.get("Peers", "remote_endpoint")
+    if "Address" not in config_interface:
+        conf_address = "N/A"
+    else:
+        conf_address = config_interface['Address']
+    conf_data = {
+       "peer_data": get_peers(config_name, search, sort),
+        "name": config_name,
+        "status": get_conf_status(config_name),
+        "total_data_usage": get_conf_total_data(config_name),
+        "public_key": get_conf_pub_key(config_name),
+        "listen_port": get_conf_listen_port(config_name),
+        "running_peer": get_conf_running_peer_number(config_name),
+        "conf_address": conf_address,
+        "wg_ip": wg_ip,
+        "sort_tag": sort,
+        "dashboard_refresh_interval": int(config.get("Server", "dashboard_refresh_interval")),
+        "peer_display_mode": peer_display_mode
+    }
+    if conf_data['status'] == "stopped":
+        conf_data['checked'] = "nope"
+    else:
+        conf_data['checked'] = "checked"
+    config.clear()
+    result = g.cur.execute(
+                "SELECT * FROM ""wg0"" " )
+    print(result)
+
+    return jsonify(conf_data)
+
+
+@api_routes.route('/add_peer/<config_name>', methods=['POST'])
+def add_peer(config_name):    
+    pass
+
+
+app.register_blueprint(api_routes, url_prefix='/api/v1.0')
 
 
 if __name__ == "__main__":
