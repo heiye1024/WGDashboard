@@ -4,6 +4,7 @@ Under Apache-2.0 License
 """
 
 import sqlite3
+from weakref import ref
 from flask import g
 import configparser
 import hashlib
@@ -1759,16 +1760,30 @@ def get_conf(config_name):
     else:
         conf_data['checked'] = "checked"
     config.clear()
-    result = g.cur.execute(
-                "SELECT * FROM ""wg0"" " )
-    print(result)
+    
 
     return jsonify(conf_data)
 
 
-@api_routes.route('/add_peer/<config_name>', methods=['POST'])
-def add_peer(config_name):    
-    pass
+@api_routes.route('/interfaces/<config_name>', methods=['GET'])
+def get_peer(config_name):    
+    peers = g.cur.execute("SELECT id, name, allowed_ip, endpoint, dns, remote_endpoint, mtu, endpoint_allowed_ip  FROM " + config_name).fetchall()
+    if len(peers) == 0:
+        return jsonify({"status": "no_peer"})
+    peer = []    
+    for i in  peers:
+        result =   {}
+        result['id'] = i[0]
+        result['name'] = i[1]
+        result['allowed_ip'] = i[2]
+        result['endpoint'] = i[3]
+        result['dns'] = i[4]
+        result['remote_endpoint'] = i[5]
+        result['mtu'] = i[6]
+        result['endpoint_allowed_ip'] = i[7]
+        peer.append(result)
+    return jsonify({'message': 'success', "response": peer})   
+
 
 
 app.register_blueprint(api_routes, url_prefix='/api/v1.0')
