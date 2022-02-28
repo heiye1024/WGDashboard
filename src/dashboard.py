@@ -4,6 +4,7 @@ Under Apache-2.0 License
 """
 
 import sqlite3
+from unicodedata import name
 from weakref import ref
 from flask import g
 import configparser
@@ -23,7 +24,7 @@ from datetime import datetime, timedelta
 from operator import itemgetter
 # PIP installed library
 import ifcfg
-from flask import Flask, request, render_template, redirect, url_for, session, jsonify
+from flask import Flask, request, render_template, redirect, url_for, session, jsonify, abort
 from flask_qrcode import QRcode
 from icmplib import ping, traceroute
 
@@ -55,7 +56,8 @@ app.secret_key = secrets.token_urlsafe(16)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 # Enable QR Code Generator
 QRcode(app)
-
+#  auth
+from utils.auth import auths, baseauth
 
 # TODO: use class and object oriented programming
 
@@ -666,6 +668,7 @@ def auth_req():
             return redirect(url_for("index"))
     conf.clear()
     return None
+
 
 
 """
@@ -1623,7 +1626,7 @@ def init_dashboard():
     if 'app_port' not in config['Server']:
         config['Server']['app_port'] = '10086'
     if 'auth_req' not in config['Server']:
-        config['Server']['auth_req'] = 'true'
+        config['Server']['auth_req'] = 'false'
     if 'version' not in config['Server'] or config['Server']['version'] != DASHBOARD_VERSION:
         config['Server']['version'] = DASHBOARD_VERSION
     if 'dashboard_refresh_interval' not in config['Server']:
@@ -1649,29 +1652,6 @@ def init_dashboard():
     config.clear()
 
 
-def check_update():
-    """
-    Dashboard check update
-
-    @return: Retunt text with result
-    @rtype: str
-    """
-    config = get_dashboard_conf()
-    try:
-        data = urllib.request.urlopen("https://api.github.com/repos/donaldzou/WGDashboard/releases").read()
-        output = json.loads(data)
-        release = []
-        for i in output:
-            if not i["prerelease"]:
-                release.append(i)
-        if config.get("Server", "version") == release[0]["tag_name"]:
-            result = "false"
-        else:
-            result = "true"
-
-        return result
-    except urllib.error.HTTPError:
-        return "false"
 
 
 """
@@ -1681,8 +1661,6 @@ Configure DashBoard before start web-server
 
 def run_dashboard():
     init_dashboard()
-    global UPDATE
-    UPDATE = check_update()
     config = configparser.ConfigParser(strict=False)
     config.read('wg-dashboard.ini')
     # global app_ip
@@ -1766,6 +1744,7 @@ def get_conf(config_name):
 
 
 @api_routes.route('/interfaces/<config_name>', methods=['GET'])
+@auths.login_required
 def get_peer(config_name):    
     peers = g.cur.execute("SELECT id, name, allowed_ip, endpoint, dns, remote_endpoint, mtu, endpoint_allowed_ip  FROM " + config_name).fetchall()
     if len(peers) == 0:
@@ -1784,6 +1763,26 @@ def get_peer(config_name):
         peer.append(result)
     return jsonify({'message': 'success', "response": peer})   
 
+@api_routes.route('/interfaces/<config_name>', methods=['POST'])
+def add_peer(config_name):
+    if not request.json or  'name' not in request.json or  'allowed_ip' not in request.json or  'endpoint' not in request.json or  'dns' not in request.json \
+         or  'remote_endpoint' not in request.json or  'mtu' not in request.json or  'endpoint_allowed_ip' not in request.json:
+        return jsonify({"status": "error", "message": "error inpuments"})
+        
+    data = request.get_json()
+    name = data['name']
+    public_key = data['public_key']
+    allowed_ips = data['allowed_ips']
+    endpoint_allowed_ip = data['endpoint_allowed_ip']
+    dns_addresses = data['DNS']
+    enable_preshared_key = data["enable_preshared_key"]
+    preshared_key = data['preshared_key']
+    keys = get_conf_peer_key(config_name)
+
+    rusle = {name: data['name']}
+
+    return jsonify({"status": "success", "data": rusle})
+
 
 
 app.register_blueprint(api_routes, url_prefix='/api/v1.0')
@@ -1791,7 +1790,6 @@ app.register_blueprint(api_routes, url_prefix='/api/v1.0')
 
 if __name__ == "__main__":
     init_dashboard()
-    UPDATE = check_update()
     config = configparser.ConfigParser(strict=False)
     config.read('wg-dashboard.ini')
     # global app_ip
