@@ -58,6 +58,9 @@ app.config['TEMPLATES_AUTO_RELOAD'] = True
 QRcode(app)
 #  auth
 from utils.auth import auths, baseauth
+# key
+from utils.key import  generate_wireguard_keys
+
 
 # TODO: use class and object oriented programming
 
@@ -1765,24 +1768,66 @@ def get_peer(config_name):
 
 @api_routes.route('/interfaces/<config_name>', methods=['POST'])
 def add_peer(config_name):
-    if not request.json or  'name' not in request.json or  'allowed_ip' not in request.json or  'endpoint' not in request.json or  'dns' not in request.json \
-         or  'remote_endpoint' not in request.json or  'mtu' not in request.json or  'endpoint_allowed_ip' not in request.json:
-        return jsonify({"status": "error", "message": "error inpuments"})
-        
+    #if not request.json or  'name' not in request.json or  'allowed_ip' not in request.json or  'endpoint' not in request.json or  'DNS' not in request.json \
+    #     or  'MTU' not in request.json :
+     #   return jsonify({"status": "error", "message": "error inpuments"})
+
+    config = get_dashboard_conf()
     data = request.get_json()
     name = data['name']
-    public_key = data['public_key']
+    key = generate_wireguard_keys()
+    public_key = key[1]
+    private_key = key[0]
     allowed_ips = data['allowed_ips']
-    endpoint_allowed_ip = data['endpoint_allowed_ip']
+    endpoint_allowed_ip = config.get("Peers", "peer_endpoint_allowed_ip")
     dns_addresses = data['DNS']
     enable_preshared_key = data["enable_preshared_key"]
     preshared_key = data['preshared_key']
     keys = get_conf_peer_key(config_name)
+    if len(public_key) == 0 or len(dns_addresses) == 0 or len(allowed_ips) == 0 or len(endpoint_allowed_ip) == 0:
+        return "Please fill in all required box."
+    if not isinstance(keys, list):
+        return config_name + " is not running."
+    if public_key in keys:
+        return "Public key already exist."
+    check_dup_ip = g.cur.execute(
+        "SELECT COUNT(*) FROM " + config_name + " WHERE allowed_ip LIKE '" + allowed_ips + "/%'", ) \
+        .fetchone()
+    if check_dup_ip[0] != 0:
+        return "Allowed IP already taken by another peer."
+    if not check_DNS(dns_addresses):
+        return "DNS formate is incorrect. Example: 1.1.1.1"
+    if not check_Allowed_IPs(endpoint_allowed_ip):
+        return "Endpoint Allowed IPs format is incorrect."
+    if len(data['MTU']) == 0 or not data['MTU'].isdigit():
+        return "MTU format is not correct."
+    if len(data['keep_alive']) == 0 or not data['keep_alive'].isdigit():
+        return "Persistent Keepalive format is not correct."
+    try:
+        if enable_preshared_key:
+            now = str(datetime.now().strftime("%m%d%Y%H%M%S"))
+            f_name = now + "_tmp_psk.txt"
+            f = open(f_name, "w+")
+            f.write(preshared_key)
+            f.close()
+            status = subprocess.check_output(
+                f"wg set {config_name} peer {public_key} allowed-ips {allowed_ips} preshared-key {f_name}",
+                shell=True, stderr=subprocess.STDOUT)
+            os.remove(f_name)
+        elif not enable_preshared_key:
+            status = subprocess.check_output(f"wg set {config_name} peer {public_key} allowed-ips {allowed_ips}",
+                                             shell=True, stderr=subprocess.STDOUT)
+        status = subprocess.check_output("wg-quick save " + config_name, shell=True, stderr=subprocess.STDOUT)
+        get_all_peers_data(config_name)
+        sql = "UPDATE " + config_name + " SET name = ?, private_key = ?, DNS = ?, endpoint_allowed_ip = ? WHERE id = ?"
+        g.cur.execute(sql, (data['name'], private_key, data['DNS'], endpoint_allowed_ip, public_key))
+        rusle = {"name": name, "plublic_key": public_key, "allowed_ips": allowed_ips, "DNS": dns_addresses, "endpoint_allowed_ip": endpoint_allowed_ip}
 
-    rusle = {name: data['name']}
 
-    return jsonify({"status": "success", "data": rusle})
+        return jsonify({"status": "success", "data": data})
 
+    except subprocess.CalledProcessError as exc:
+        return exc.output.strip()
 
 
 app.register_blueprint(api_routes, url_prefix='/api/v1.0')
