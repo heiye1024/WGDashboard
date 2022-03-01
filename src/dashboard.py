@@ -1778,12 +1778,16 @@ def add_peer(config_name):
     key = generate_wireguard_keys()
     public_key = key[1]
     private_key = key[0]
-    allowed_ips = data['allowed_ips']
+    #allowed_ips = data['allowed_ips']
+    allowed_ips =  f_available_ips(config_name)
     endpoint_allowed_ip = config.get("Peers", "peer_endpoint_allowed_ip")
-    dns_addresses = data['DNS']
-    enable_preshared_key = data["enable_preshared_key"]
-    preshared_key = data['preshared_key']
+    peer_mtu  = config.get("Peers", "peer_mtu")
+    dns_addresses = config.get("Peers", "peer_global_dns")
+    keep_alive = config.get("Peers", "peer_keep_alive")
+    enable_preshared_key = None  ## TODO
+    preshared_key = None ## TODO
     keys = get_conf_peer_key(config_name)
+    endpoint_allowed_ip = config.get("Peers", "peer_endpoint_allowed_ip")
     if len(public_key) == 0 or len(dns_addresses) == 0 or len(allowed_ips) == 0 or len(endpoint_allowed_ip) == 0:
         return "Please fill in all required box."
     if not isinstance(keys, list):
@@ -1799,10 +1803,7 @@ def add_peer(config_name):
         return "DNS formate is incorrect. Example: 1.1.1.1"
     if not check_Allowed_IPs(endpoint_allowed_ip):
         return "Endpoint Allowed IPs format is incorrect."
-    if len(data['MTU']) == 0 or not data['MTU'].isdigit():
-        return "MTU format is not correct."
-    if len(data['keep_alive']) == 0 or not data['keep_alive'].isdigit():
-        return "Persistent Keepalive format is not correct."
+
     try:
         if enable_preshared_key:
             now = str(datetime.now().strftime("%m%d%Y%H%M%S"))
@@ -1820,11 +1821,12 @@ def add_peer(config_name):
         status = subprocess.check_output("wg-quick save " + config_name, shell=True, stderr=subprocess.STDOUT)
         get_all_peers_data(config_name)
         sql = "UPDATE " + config_name + " SET name = ?, private_key = ?, DNS = ?, endpoint_allowed_ip = ? WHERE id = ?"
-        g.cur.execute(sql, (data['name'], private_key, data['DNS'], endpoint_allowed_ip, public_key))
-        rusle = {"name": name, "plublic_key": public_key, "allowed_ips": allowed_ips, "DNS": dns_addresses, "endpoint_allowed_ip": endpoint_allowed_ip}
+        g.cur.execute(sql, (data['name'], private_key, dns_addresses, endpoint_allowed_ip, public_key))
+        rusle = {"name": name, "plublic_key": public_key, "allowed_ips": allowed_ips, "DNS": dns_addresses, "endpoint_allowed_ip": endpoint_allowed_ip, \
+            "private_key": private_key, "PersistentKeepalive": keep_alive, "MTU": peer_mtu, "private_key": private_key}
 
 
-        return jsonify({"status": "success", "data": data})
+        return jsonify({"status": "success", "data": rusle})
 
     except subprocess.CalledProcessError as exc:
         return exc.output.strip()
