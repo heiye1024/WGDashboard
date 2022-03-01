@@ -1747,7 +1747,7 @@ def get_conf(config_name):
 
 
 @api_routes.route('/interfaces/<config_name>', methods=['GET'])
-@auths.login_required
+#@auths.login_required
 def get_peer(config_name):    
     peers = g.cur.execute("SELECT id, name, allowed_ip, endpoint, dns, remote_endpoint, mtu, endpoint_allowed_ip  FROM " + config_name).fetchall()
     if len(peers) == 0:
@@ -1779,7 +1779,7 @@ def add_peer(config_name):
     public_key = key[1]
     private_key = key[0]
     #allowed_ips = data['allowed_ips']
-    allowed_ips =  f_available_ips(config_name)
+    allowed_ips =  f_available_ips(config_name)[0]
     endpoint_allowed_ip = config.get("Peers", "peer_endpoint_allowed_ip")
     peer_mtu  = config.get("Peers", "peer_mtu")
     dns_addresses = config.get("Peers", "peer_global_dns")
@@ -1819,12 +1819,12 @@ def add_peer(config_name):
             status = subprocess.check_output(f"wg set {config_name} peer {public_key} allowed-ips {allowed_ips}",
                                              shell=True, stderr=subprocess.STDOUT)
         status = subprocess.check_output("wg-quick save " + config_name, shell=True, stderr=subprocess.STDOUT)
-        get_all_peers_data(config_name)
+        #get_all_peers_data(config_name)
         sql = "UPDATE " + config_name + " SET name = ?, private_key = ?, DNS = ?, endpoint_allowed_ip = ? WHERE id = ?"
-        g.cur.execute(sql, (data['name'], private_key, dns_addresses, endpoint_allowed_ip, public_key))
+        g.cur.execute(sql, (name, private_key, dns_addresses, endpoint_allowed_ip, public_key))
+        g.db.commit()
         rusle = {"name": name, "plublic_key": public_key, "allowed_ips": allowed_ips, "DNS": dns_addresses, "endpoint_allowed_ip": endpoint_allowed_ip, \
             "private_key": private_key, "PersistentKeepalive": keep_alive, "MTU": peer_mtu, "private_key": private_key}
-
 
         return jsonify({"status": "success", "data": rusle})
 
