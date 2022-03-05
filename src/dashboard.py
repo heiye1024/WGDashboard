@@ -36,7 +36,6 @@ from util import regex_match, check_DNS, check_Allowed_IPs, check_remote_endpoin
 
 
 
-
 # Dashboard Version
 DASHBOARD_VERSION = 'v3.0.5'
 # WireGuard's configuration path
@@ -57,7 +56,7 @@ app.config['TEMPLATES_AUTO_RELOAD'] = True
 # Enable QR Code Generator
 QRcode(app)
 #  auth
-from utils.auth import auths, baseauth
+from utils.auth import token_auth, basic_auth, login_required
 # key
 from utils.key import  generate_wireguard_keys
 
@@ -653,6 +652,7 @@ def auth_req():
     session['dashboard_version'] = DASHBOARD_VERSION
     if req == "true":
         if '/static/' not in request.path and \
+                '/api' not in request.path and \
                 request.endpoint != "signin" and \
                 request.endpoint != "signout" and \
                 request.endpoint != "auth" and \
@@ -729,6 +729,8 @@ Index Page
 
 
 @app.route('/', methods=['GET'])
+#@basic_auth.login_required
+#@auth_req()
 def index():
     """
     Index page related
@@ -738,7 +740,6 @@ def index():
     if "switch_msg" in session:
         msg = session["switch_msg"]
         session.pop("switch_msg")
-
     return render_template('index.html', conf=get_conf_list(), msg=msg)
 
 
@@ -1747,7 +1748,7 @@ def get_conf(config_name):
 
 
 @api_routes.route('/interfaces/<config_name>', methods=['GET'])
-#@auths.login_required
+@token_auth.login_required
 def get_peer(config_name):    
     peers = g.cur.execute("SELECT id, name, allowed_ip, endpoint, dns, remote_endpoint, mtu, endpoint_allowed_ip  FROM " + config_name).fetchall()
     if len(peers) == 0:
@@ -1768,10 +1769,6 @@ def get_peer(config_name):
 
 @api_routes.route('/interfaces/<config_name>', methods=['POST'])
 def add_peer(config_name):
-    #if not request.json or  'name' not in request.json or  'allowed_ip' not in request.json or  'endpoint' not in request.json or  'DNS' not in request.json \
-    #     or  'MTU' not in request.json :
-     #   return jsonify({"status": "error", "message": "error inpuments"})
-
     config = get_dashboard_conf()
     data = request.get_json()
     name = data['name']
@@ -1819,7 +1816,7 @@ def add_peer(config_name):
             status = subprocess.check_output(f"wg set {config_name} peer {public_key} allowed-ips {allowed_ips}",
                                              shell=True, stderr=subprocess.STDOUT)
         status = subprocess.check_output("wg-quick save " + config_name, shell=True, stderr=subprocess.STDOUT)
-        #get_all_peers_data(config_name)
+        get_all_peers_data(config_name)
         sql = "UPDATE " + config_name + " SET name = ?, private_key = ?, DNS = ?, endpoint_allowed_ip = ? WHERE id = ?"
         g.cur.execute(sql, (name, private_key, dns_addresses, endpoint_allowed_ip, public_key))
         g.db.commit()
