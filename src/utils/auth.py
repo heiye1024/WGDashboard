@@ -2,12 +2,10 @@ from email import message
 from flask import  jsonify,  session, render_template, redirect, request
 from flask_httpauth import HTTPTokenAuth, HTTPBasicAuth, MultiAuth
 from werkzeug.security import generate_password_hash, check_password_hash
-from utils.tools  import get_dashboard_conf
 
 token_auth = HTTPTokenAuth(scheme='Szyh')
 basic_auth = HTTPBasicAuth()
 
-config = get_dashboard_conf()
 
 multi_auth = MultiAuth(basic_auth, token_auth)
 
@@ -37,17 +35,3 @@ def verify_token(token):
     return False
 
 
-'''
-def login_required(func):
-    def inner(*args, **kwargs):
-        # 从session获取用户信息，如果有，则用户已登录，否则没有登录
-
-        msg = ""
-        if "message" in session:
-            return render_template('index.html',  message=msg)
-
-        return render_template('signin.html', message=message)
-        #return func(*args, **kwargs)
-    return inner
-
-'''
