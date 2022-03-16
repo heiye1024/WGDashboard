@@ -56,7 +56,7 @@ app.config['TEMPLATES_AUTO_RELOAD'] = True
 # Enable QR Code Generator
 QRcode(app)
 #  auth
-from utils.auth import token_auth, basic_auth, login_required
+from utils.auth import token_auth, basic_auth
 # key
 from utils.key import  generate_wireguard_keys
 
@@ -1701,6 +1701,7 @@ api_routes = Blueprint("api", __name__)
 
 
 @api_routes.route('/interface/<config_name>', methods=['GET'])
+@token_auth.login_required
 def get_conf(config_name):
     """
     Get configuration setting of wireguard interface.
@@ -1768,6 +1769,7 @@ def get_peer(config_name):
     return jsonify({'message': 'success', "response": peer})   
 
 @api_routes.route('/interfaces/<config_name>', methods=['POST'])
+@token_auth.login_required
 def add_peer(config_name):
     config = get_dashboard_conf()
     data = request.get_json()
