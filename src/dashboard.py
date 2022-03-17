@@ -1834,9 +1834,9 @@ def add_peer(config_name):
 @api_routes.route('/interfaces//wg0/<name>', methods=['GET'])
 @token_auth.login_required
 def get_name(name):    
-    peers = g.cur.execute("SELECT id, name, allowed_ip, endpoint, dns, remote_endpoint, mtu, endpoint_allowed_ip  FROM wg0  where name  =?  " , [name])
+    peers = g.cur.execute("SELECT id, name, allowed_ip, endpoint, dns, remote_endpoint, mtu, endpoint_allowed_ip  FROM wg0  where name  =? " , [name])
     if (peers) is None:
-        return jsonify({"status": "no_peer"})
+        return jsonify({'message': 'success', "response": "no_peer"})
     peer = []    
     for i in  peers:
         result =   {}
