@@ -1773,11 +1773,11 @@ def get_peer(config_name):
 def add_peer(config_name):
     config = get_dashboard_conf()
     data = request.get_json()
-    name = data['name']
     key = generate_wireguard_keys()
+    name = data['name']
+
     public_key = key[1]
     private_key = key[0]
-    #allowed_ips = data['allowed_ips']
     allowed_ips =  f_available_ips(config_name)[0]
     endpoint_allowed_ip = config.get("Peers", "peer_endpoint_allowed_ip")
     peer_mtu  = config.get("Peers", "peer_mtu")
@@ -1830,6 +1830,26 @@ def add_peer(config_name):
     except subprocess.CalledProcessError as exc:
         return exc.output.strip()
 
+
+@api_routes.route('/interfaces//wg0/<name>', methods=['GET'])
+@token_auth.login_required
+def get_name(name):    
+    peers = g.cur.execute("SELECT id, name, allowed_ip, endpoint, dns, remote_endpoint, mtu, endpoint_allowed_ip  FROM wg0  where name  =?  " , [name])
+    if (peers) is None:
+        return jsonify({"status": "no_peer"})
+    peer = []    
+    for i in  peers:
+        result =   {}
+        result['id'] = i[0]
+        result['name'] = i[1]
+        result['allowed_ip'] = i[2]
+        result['endpoint'] = i[3]
+        result['dns'] = i[4]
+        result['remote_endpoint'] = i[5]
+        result['mtu'] = i[6]
+        result['endpoint_allowed_ip'] = i[7]
+        peer.append(result) 
+    return jsonify({'message': 'success', "response": peer})  
 
 app.register_blueprint(api_routes, url_prefix='/api/v1.0')
 
