@@ -1167,7 +1167,13 @@ def add_peer(config_name):
     dns_addresses = data['DNS']
     enable_preshared_key = data["enable_preshared_key"]
     preshared_key = data['preshared_key']
+    name= data['name']
     keys = get_conf_peer_key(config_name)
+    peers = g.cur.execute("SELECT id, name, allowed_ip, endpoint, dns, remote_endpoint, mtu, endpoint_allowed_ip  FROM wg0  where name  =? " , [name])
+    if len(peers.fetchall()) != 0:
+        return  "name already exist"
+    if (peers) is None:
+        return jsonify({'message': 'success', "response": "no_peer"})
     if len(public_key) == 0 or len(dns_addresses) == 0 or len(allowed_ips) == 0 or len(endpoint_allowed_ip) == 0:
         return "Please fill in all required box."
     if not isinstance(keys, list):
@@ -1778,8 +1784,6 @@ def add_peer(config_name):
     peers = g.cur.execute("SELECT id, name, allowed_ip, endpoint, dns, remote_endpoint, mtu, endpoint_allowed_ip  FROM wg0  where name  =? " , [name])
     if len(peers.fetchall()) != 0:
         return jsonify({'message': 'success', "response": "name already exist"})
-
-
     public_key = key[1]
     private_key = key[0]
     allowed_ips =  f_available_ips(config_name)[0]
