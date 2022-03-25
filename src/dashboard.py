@@ -498,7 +498,7 @@ def get_conf_list():
             create_table = f"""
                 CREATE TABLE IF NOT EXISTS {i} (
                     id VARCHAR NOT NULL, private_key VARCHAR NULL, DNS VARCHAR NULL, 
-                    endpoint_allowed_ip VARCHAR NULL, name VARCHAR NULL, total_receive FLOAT NULL, 
+                    endpoint_allowed_ip VARCHAR NULL, name VARCHAR NOT NULL UNIQUE, total_receive FLOAT NULL, 
                     total_sent FLOAT NULL, total_data FLOAT NULL, endpoint VARCHAR NULL, 
                     status VARCHAR NULL, latest_handshake VARCHAR NULL, allowed_ip VARCHAR NULL, 
                     cumu_receive FLOAT NULL, cumu_sent FLOAT NULL, cumu_data FLOAT NULL, mtu INT NULL, 
@@ -1775,6 +1775,10 @@ def add_peer(config_name):
     data = request.get_json()
     key = generate_wireguard_keys()
     name = data['name']
+    peers = g.cur.execute("SELECT id, name, allowed_ip, endpoint, dns, remote_endpoint, mtu, endpoint_allowed_ip  FROM wg0  where name  =? " , [name])
+    if len(peers.fetchall()) != 0:
+        return jsonify({'message': 'success', "response": "name already exist"})
+
 
     public_key = key[1]
     private_key = key[0]
